@@ -23,7 +23,7 @@ class AuthService {
 
       // Check if session is valid
       const sessions = await blink.db.userSessions.list({
-        where: { sessionToken }
+        where: { session_token: sessionToken }
       })
 
       if (sessions.length === 0) {
@@ -42,7 +42,7 @@ class AuthService {
 
       // Get user data
       const users = await blink.db.users.list({
-        where: { id: session.user_id, isActive: 1 }
+        where: { id: session.user_id, is_active: 1 }
       })
 
       if (users.length === 0) {
@@ -76,7 +76,7 @@ class AuthService {
       if (sessionToken) {
         // Delete session from database
         const sessions = await blink.db.userSessions.list({
-          where: { sessionToken }
+          where: { session_token: sessionToken }
         })
 
         for (const session of sessions) {
@@ -103,9 +103,9 @@ class AuthService {
   async updateUserMessageCount(userId: string, messagesSent: number): Promise<void> {
     try {
       await blink.db.users.update(userId, {
-        messagesSent,
-        updatedAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString()
+        messages_sent: messagesSent,
+        updated_at: new Date().toISOString(),
+        last_login: new Date().toISOString()
       })
 
       // Update current user if it's the same user
@@ -125,12 +125,12 @@ class AuthService {
       const subscriptionEndDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
 
       await blink.db.users.update(userId, {
-        planType,
-        messageLimit,
-        subscriptionStatus: 'active',
-        subscriptionStartDate: now,
-        subscriptionEndDate,
-        updatedAt: now
+        plan_type: planType,
+        message_limit: messageLimit,
+        subscription_status: 'active',
+        subscription_start_date: now,
+        subscription_end_date: subscriptionEndDate,
+        updated_at: now
       })
 
       // Update current user
@@ -159,8 +159,8 @@ class AuthService {
       const users = await blink.db.users.list({
         where: { 
           email, 
-          passwordHash,
-          isActive: 1 
+          password_hash: passwordHash,
+          is_active: 1 
         }
       })
 
@@ -174,8 +174,8 @@ class AuthService {
 
       // Update last login
       await blink.db.users.update(user.id, {
-        lastLogin: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        last_login: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
 
       // Create new session
@@ -184,10 +184,10 @@ class AuthService {
 
       await blink.db.userSessions.create({
         id: `sess_${Date.now()}`,
-        userId: user.id,
-        sessionToken,
-        expiresAt: sessionExpiry,
-        createdAt: new Date().toISOString()
+        user_id: user.id,
+        session_token: sessionToken,
+        expires_at: sessionExpiry,
+        created_at: new Date().toISOString()
       })
 
       // Store session in localStorage
@@ -226,7 +226,7 @@ class AuthService {
   async refreshUserData(userId: string): Promise<User | null> {
     try {
       const users = await blink.db.users.list({
-        where: { id: userId, isActive: 1 }
+        where: { id: userId, is_active: 1 }
       })
 
       if (users.length === 0) {
@@ -259,7 +259,7 @@ class AuthService {
       // Verify current password
       const currentPasswordHash = await this.hashPassword(currentPassword)
       const users = await blink.db.users.list({
-        where: { email, passwordHash: currentPasswordHash }
+        where: { email, password_hash: currentPasswordHash }
       })
 
       if (users.length === 0) {
@@ -269,8 +269,8 @@ class AuthService {
       // Update to new password
       const newPasswordHash = await this.hashPassword(newPassword)
       await blink.db.users.update(users[0].id, {
-        passwordHash: newPasswordHash,
-        updatedAt: new Date().toISOString()
+        password_hash: newPasswordHash,
+        updated_at: new Date().toISOString()
       })
 
       return true

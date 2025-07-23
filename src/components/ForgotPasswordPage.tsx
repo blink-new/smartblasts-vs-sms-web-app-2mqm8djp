@@ -44,7 +44,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onBack, onSwitc
       
       // Check if user exists
       const users = await blink.db.users.list({
-        where: { email, isActive: 1 }
+        where: { email, is_active: 1 }
       })
 
       if (users.length === 0) {
@@ -67,8 +67,8 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onBack, onSwitc
 
       // Update user's password
       await blink.db.users.update(user.id, {
-        passwordHash,
-        updatedAt: new Date().toISOString()
+        password_hash: passwordHash,
+        updated_at: new Date().toISOString()
       })
 
       // Send password reset email (simulated)

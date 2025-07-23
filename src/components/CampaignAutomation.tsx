@@ -45,6 +45,7 @@ const CampaignAutomation: React.FC<CampaignAutomationProps> = ({ user, onBack })
   const [campaigns, setCampaigns] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateRule, setShowCreateRule] = useState(false)
+  const [editingRule, setEditingRule] = useState<AutomationRule | null>(null)
   const [newRule, setNewRule] = useState({
     name: '',
     description: '',
@@ -93,6 +94,50 @@ const CampaignAutomation: React.FC<CampaignAutomationProps> = ({ user, onBack })
     loadData()
   }, [loadData])
 
+  const resetForm = () => {
+    setNewRule({
+      name: '',
+      description: '',
+      triggerType: 'time_based',
+      campaignId: '',
+      scheduleTime: '',
+      scheduleDate: '',
+      followUpDelay: 24,
+      conditions: {
+        noResponse: true,
+        responseReceived: false
+      }
+    })
+    setShowCreateRule(false)
+    setEditingRule(null)
+  }
+
+  const editRule = (rule: AutomationRule) => {
+    try {
+      const actions = JSON.parse(rule.actions)
+      const conditions = JSON.parse(rule.conditions)
+      
+      setNewRule({
+        name: rule.name,
+        description: rule.description,
+        triggerType: rule.triggerType,
+        campaignId: rule.campaignId,
+        scheduleTime: actions.scheduleTime || '',
+        scheduleDate: actions.scheduleDate || '',
+        followUpDelay: actions.followUpDelay || 24,
+        conditions: conditions || {
+          noResponse: true,
+          responseReceived: false
+        }
+      })
+      setEditingRule(rule)
+      setShowCreateRule(true)
+    } catch (error) {
+      console.error('Error parsing rule data:', error)
+      alert('Error loading rule data for editing.')
+    }
+  }
+
   const createAutomationRule = async () => {
     if (!newRule.name || !newRule.campaignId) {
       alert('Please fill in all required fields')
@@ -100,48 +145,52 @@ const CampaignAutomation: React.FC<CampaignAutomationProps> = ({ user, onBack })
     }
 
     try {
-      const ruleId = `rule_${Date.now()}`
-      
-      // Create the automation rule
-      await blink.db.automationRules.create({
-        id: ruleId,
-        userId: user.id,
-        name: newRule.name,
-        description: newRule.description,
-        triggerType: newRule.triggerType,
-        campaignId: newRule.campaignId,
-        isActive: true,
-        conditions: JSON.stringify(newRule.conditions),
-        actions: JSON.stringify({
-          scheduleTime: newRule.scheduleTime,
-          scheduleDate: newRule.scheduleDate,
-          followUpDelay: newRule.followUpDelay
-        }),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      })
+      if (editingRule) {
+        // Update existing rule
+        await blink.db.automationRules.update(editingRule.id, {
+          name: newRule.name,
+          description: newRule.description,
+          triggerType: newRule.triggerType,
+          campaignId: newRule.campaignId,
+          conditions: JSON.stringify(newRule.conditions),
+          actions: JSON.stringify({
+            scheduleTime: newRule.scheduleTime,
+            scheduleDate: newRule.scheduleDate,
+            followUpDelay: newRule.followUpDelay
+          }),
+          updatedAt: new Date().toISOString()
+        })
+        alert('Automation rule updated successfully!')
+      } else {
+        // Create new rule
+        const ruleId = `rule_${Date.now()}`
+        
+        await blink.db.automationRules.create({
+          id: ruleId,
+          userId: user.id,
+          name: newRule.name,
+          description: newRule.description,
+          triggerType: newRule.triggerType,
+          campaignId: newRule.campaignId,
+          isActive: true,
+          conditions: JSON.stringify(newRule.conditions),
+          actions: JSON.stringify({
+            scheduleTime: newRule.scheduleTime,
+            scheduleDate: newRule.scheduleDate,
+            followUpDelay: newRule.followUpDelay
+          }),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })
+        alert('Automation rule created successfully!')
+      }
 
       // Reset form
-      setNewRule({
-        name: '',
-        description: '',
-        triggerType: 'time_based',
-        campaignId: '',
-        scheduleTime: '',
-        scheduleDate: '',
-        followUpDelay: 24,
-        conditions: {
-          noResponse: true,
-          responseReceived: false
-        }
-      })
-
-      setShowCreateRule(false)
+      resetForm()
       loadData()
-      alert('Automation rule created successfully!')
     } catch (error) {
-      console.error('Error creating automation rule:', error)
-      alert('Failed to create automation rule. Please try again.')
+      console.error('Error saving automation rule:', error)
+      alert('Failed to save automation rule. Please try again.')
     }
   }
 
@@ -207,8 +256,8 @@ const CampaignAutomation: React.FC<CampaignAutomationProps> = ({ user, onBack })
         {showCreateRule ? (
           <Card>
             <CardHeader>
-              <CardTitle>Create New Automation Rule</CardTitle>
-              <p className="text-gray-600">Set up automated actions for your campaigns</p>
+              <CardTitle>{editingRule ? 'Edit Automation Rule' : 'Create New Automation Rule'}</CardTitle>
+              <p className="text-gray-600">{editingRule ? 'Update your automation rule settings' : 'Set up automated actions for your campaigns'}</p>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
@@ -326,11 +375,11 @@ const CampaignAutomation: React.FC<CampaignAutomationProps> = ({ user, onBack })
                 )}
 
                 <div className="flex justify-end space-x-4">
-                  <Button variant="outline" onClick={() => setShowCreateRule(false)}>
+                  <Button variant="outline" onClick={resetForm}>
                     Cancel
                   </Button>
                   <Button onClick={createAutomationRule}>
-                    Create Rule
+                    {editingRule ? 'Update Rule' : 'Create Rule'}
                   </Button>
                 </div>
               </div>
@@ -445,7 +494,17 @@ const CampaignAutomation: React.FC<CampaignAutomationProps> = ({ user, onBack })
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => editRule(rule)}
+                              className="text-blue-600 hover:text-blue-700"
+                              title="Edit rule"
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => toggleRuleStatus(rule.id, rule.isActive)}
+                              title={rule.isActive ? "Pause rule" : "Activate rule"}
                             >
                               {rule.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                             </Button>
@@ -454,6 +513,7 @@ const CampaignAutomation: React.FC<CampaignAutomationProps> = ({ user, onBack })
                               size="sm"
                               onClick={() => deleteRule(rule.id)}
                               className="text-red-600 hover:text-red-700"
+                              title="Delete rule"
                             >
                               <AlertTriangle className="h-4 w-4" />
                             </Button>
