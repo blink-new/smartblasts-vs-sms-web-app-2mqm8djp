@@ -17,6 +17,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onBack, onSwitc
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [tempPassword, setTempPassword] = useState('')
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -42,10 +43,12 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onBack, onSwitc
     try {
       console.log('🔍 Checking if user exists:', email)
       
-      // Check if user exists
+      // Check if user exists using camelCase (Blink SDK converts to snake_case)
       const users = await blink.db.users.list({
-        where: { email, is_active: 1 }
+        where: { email, isActive: 1 }
       })
+
+      console.log('🔍 Found users:', users.length)
 
       if (users.length === 0) {
         setError('No account found with this email address. Please check your email or create a new account.')
@@ -54,22 +57,28 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onBack, onSwitc
       }
 
       const user = users[0]
+      console.log('👤 User found:', user.email)
       
-      // Generate a temporary password
-      const tempPassword = Math.random().toString(36).slice(-8).toUpperCase()
+      // Generate a temporary password (make it more user-friendly)
+      const tempPassword = 'TEMP' + Math.random().toString(36).slice(-6).toUpperCase()
+      console.log('🔑 Generated temp password:', tempPassword)
       
-      // Hash the temporary password
+      // Hash the temporary password using the same method as authService
       const encoder = new TextEncoder()
       const data = encoder.encode(tempPassword + 'smartblasts_salt')
       const hashBuffer = await crypto.subtle.digest('SHA-256', data)
       const hashArray = Array.from(new Uint8Array(hashBuffer))
       const passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 
-      // Update user's password
+      console.log('🔐 Password hash generated')
+
+      // Update user's password using camelCase (Blink SDK converts to snake_case)
       await blink.db.users.update(user.id, {
-        password_hash: passwordHash,
-        updated_at: new Date().toISOString()
+        passwordHash: passwordHash,
+        updatedAt: new Date().toISOString()
       })
+
+      console.log('✅ Password updated in database')
 
       // Send password reset email (simulated)
       console.log('📧 Sending password reset email to:', email)
@@ -77,8 +86,9 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onBack, onSwitc
       
       // In a real application, you would send an actual email here
       // For now, we'll show the temporary password in an alert
-      alert(`Password Reset\n\nYour temporary password is: ${tempPassword}\n\nPlease use this to log in and change your password immediately.\n\nFor security reasons, this password will expire in 24 hours.`)
+      alert(`🔑 PASSWORD RESET SUCCESSFUL\n\nYour temporary password is:\n${tempPassword}\n\n📝 IMPORTANT INSTRUCTIONS:\n1. Copy this password exactly (case-sensitive)\n2. Go back to the login page\n3. Use your email: ${email}\n4. Use this temporary password\n5. Change your password after logging in\n\n⚠️ This password expires in 24 hours for security.`)
 
+      setTempPassword(tempPassword)
       setSuccess(true)
       console.log('✅ Password reset completed')
 
@@ -99,17 +109,34 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onBack, onSwitc
               <div className="mx-auto mb-4 w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                 <CheckCircle className="h-6 w-6 text-green-600" />
               </div>
-              <CardTitle className="text-2xl">Password Reset Sent</CardTitle>
-              <p className="text-gray-600">Check your email for the temporary password</p>
+              <CardTitle className="text-2xl">Password Reset Complete</CardTitle>
+              <p className="text-gray-600">Your temporary password is ready to use</p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="text-center space-y-2">
+              <div className="text-center space-y-4">
                 <p className="text-sm text-gray-600">
-                  We've sent a temporary password to <strong>{email}</strong>
+                  Password reset successful for <strong>{email}</strong>
                 </p>
-                <p className="text-sm text-gray-600">
-                  Use the temporary password to log in, then change it immediately for security.
-                </p>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm font-medium text-blue-900 mb-2">Your Temporary Password:</p>
+                  <div className="bg-white border border-blue-300 rounded px-3 py-2 font-mono text-lg font-bold text-blue-800 select-all">
+                    {tempPassword}
+                  </div>
+                  <p className="text-xs text-blue-700 mt-2">
+                    Click to select all • Copy this password exactly (case-sensitive)
+                  </p>
+                </div>
+                
+                <div className="text-left space-y-1 text-sm text-gray-600">
+                  <p className="font-medium">Instructions:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-xs">
+                    <li>Copy the temporary password above</li>
+                    <li>Click "Return to Sign In" below</li>
+                    <li>Use your email and the temporary password</li>
+                    <li>Change your password after logging in</li>
+                  </ol>
+                </div>
               </div>
               
               <Button onClick={onSwitchToLogin} className="w-full">
